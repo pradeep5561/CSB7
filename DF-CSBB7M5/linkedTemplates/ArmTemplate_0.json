@@ -1,0 +1,303 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "DF-CSBB7M5"
+		},
+		"AzureBlobStorage1_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AzureBlobStorage1'"
+		},
+		"AzureDatabricks1_accessToken": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accessToken' of 'AzureDatabricks1'"
+		},
+		"AzureDatabricks2_accessToken": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accessToken' of 'AzureDatabricks2'"
+		},
+		"AzureDatabricks1_properties_typeProperties_existingClusterId": {
+			"type": "string",
+			"defaultValue": "0901-113856-s59x0l55"
+		},
+		"AzureDatabricks2_properties_typeProperties_existingClusterId": {
+			"type": "string",
+			"defaultValue": "0901-113856-s59x0l55"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureBlobStorage1')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('AzureBlobStorage1_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureDatabricks1')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureDatabricks",
+				"typeProperties": {
+					"domain": "https://adb-1731136320233578.18.azuredatabricks.net",
+					"accessToken": {
+						"type": "SecureString",
+						"value": "[parameters('AzureDatabricks1_accessToken')]"
+					},
+					"existingClusterId": "[parameters('AzureDatabricks1_properties_typeProperties_existingClusterId')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureDatabricks2')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureDatabricks",
+				"typeProperties": {
+					"domain": "https://adb-1731136320233578.18.azuredatabricks.net",
+					"accessToken": {
+						"type": "SecureString",
+						"value": "[parameters('AzureDatabricks2_accessToken')]"
+					},
+					"existingClusterId": "[parameters('AzureDatabricks2_properties_typeProperties_existingClusterId')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CSB_M7B5_Evaluation')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "CSB_B7M5_transformation",
+						"type": "DatabricksNotebook",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"notebookPath": "/Shared/CSB-B7M5-mainExecution",
+							"baseParameters": {
+								"table": {
+									"value": "@pipeline().parameters.Table_name",
+									"type": "Expression"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureDatabricks1",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Email Notification",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "CSB_B7M5_transformation",
+								"dependencyConditions": [
+									"Failed",
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": "https://prod-46.eastus.logic.azure.com:443/workflows/fe0acb17442a4361b0724aa0e2986d6d/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=LpzYYtt7H4dM6sIakkbezlNGnzuhD7IzPyQaXiv-stQ",
+							"method": "POST",
+							"headers": {
+								"Content-Type": "application/json"
+							},
+							"body": {
+								"value": "{\n    \"PipelineName\":\"@{pipeline().Pipeline}\",\n    \"Status\":\"@{activity('CSB_B7M5_transformation').status}\",\n    \"DFName\":\"@{pipeline().DataFactory}\",\n    \"RunId\":\"@{pipeline().RunId}\",\n    \"TO\": \"@{pipeline().parameters.To}\",\n    \"Cc\":\"@{pipeline().parameters.Cc}\",\n    \"Tmp\":\"@{pipeline().parameters.Tmp}\"\n}",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"Table_name": {
+						"type": "String",
+						"defaultValue": "table2"
+					},
+					"To": {
+						"type": "string",
+						"defaultValue": "manish.kailodiya@impetus.com;pradeep.thanniru@impetus.com;dipin.raj@impetus.com;shekhar.zambare@impetus.com;harsh.verma@impetus.com"
+					},
+					"Cc": {
+						"type": "string",
+						"defaultValue": "manish.kailodiya@impetus.com"
+					},
+					"Tmp": {
+						"type": "string",
+						"defaultValue": "defnone"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2023-09-11T15:46:33Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDatabricks1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CSB_M7B5_Evaluation_Working_back')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "CSB_B7M5_transformation",
+						"type": "DatabricksNotebook",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"notebookPath": "/Shared/CSB-B7M5-mainExecution",
+							"baseParameters": {
+								"table": {
+									"value": "@pipeline().parameters.Table_name",
+									"type": "Expression"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureDatabricks1",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Email Notification",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "CSB_B7M5_transformation",
+								"dependencyConditions": [
+									"Failed",
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": "https://prod-46.eastus.logic.azure.com:443/workflows/fe0acb17442a4361b0724aa0e2986d6d/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=LpzYYtt7H4dM6sIakkbezlNGnzuhD7IzPyQaXiv-stQ",
+							"method": "POST",
+							"headers": {
+								"Content-Type": "application/json"
+							},
+							"body": {
+								"value": "{\n    \"PipelineName\":\"@{pipeline().Pipeline}\",\n    \"Status\":\"@{activity('CSB_B7M5_transformation').status}\",\n    \"DFName\":\"@{pipeline().DataFactory}\",\n    \"RunId\":\"@{pipeline().RunId}\",\n    \"TO\": \"@{pipeline().parameters.To}\",\n    \"Cc\":\"@{pipeline().parameters.Cc}\",\n    \"Tmp\":\"@{pipeline().parameters.Tmp}\"\n}",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"Table_name": {
+						"type": "String",
+						"defaultValue": "table1"
+					},
+					"To": {
+						"type": "string",
+						"defaultValue": "manish.kailodiya@impetus.com;pradeep.thanniru@impetus.com;dipin.raj@impetus.com;shekhar.zambare@impetus.com;harsh.verma@impetus.com"
+					},
+					"Cc": {
+						"type": "string",
+						"defaultValue": "manish.kailodiya@impetus.com"
+					},
+					"Tmp": {
+						"type": "string",
+						"defaultValue": "defnone"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2023-09-11T15:46:33Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDatabricks1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/trigger_5mins')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Stopped",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "CSB_M7B5_Evaluation",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Minute",
+						"interval": 5,
+						"startTime": "2023-09-10T09:45:00",
+						"timeZone": "India Standard Time"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/CSB_M7B5_Evaluation')]"
+			]
+		}
+	]
+}

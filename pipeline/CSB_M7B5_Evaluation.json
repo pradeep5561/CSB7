@@ -64,7 +64,7 @@
 		"parameters": {
 			"Table_name": {
 				"type": "String",
-				"defaultValue": "table1"
+				"defaultValue": "table2"
 			},
 			"To": {
 				"type": "string",

@@ -1,0 +1,9 @@
+{
+	"name": "DF-CSBB7M5",
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "c967a142-474d-4296-808b-8b96a65ab94f",
+		"tenantId": "1052b257-daab-4c96-99b2-a9fc920bb938"
+	}
+}

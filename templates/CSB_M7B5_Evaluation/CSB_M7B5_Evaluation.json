@@ -1,0 +1,106 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name"
+		},
+		"AzureDatabricks1": {
+			"type": "string"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/CSB_M7B5_Evaluation')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "CSB_B7M5_transformation",
+						"type": "DatabricksNotebook",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"notebookPath": "/Shared/CSB-B7M5-mainExecution",
+							"baseParameters": {
+								"table": {
+									"value": "@pipeline().parameters.Table_name",
+									"type": "Expression"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "[parameters('AzureDatabricks1')]",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Email Notification",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "CSB_B7M5_transformation",
+								"dependencyConditions": [
+									"Failed",
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": "https://prod-46.eastus.logic.azure.com:443/workflows/fe0acb17442a4361b0724aa0e2986d6d/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=LpzYYtt7H4dM6sIakkbezlNGnzuhD7IzPyQaXiv-stQ",
+							"method": "POST",
+							"headers": {
+								"Content-Type": "application/json"
+							},
+							"body": {
+								"value": "{\n    \"PipelineName\":\"@{pipeline().Pipeline}\",\n    \"Status\":\"@{activity('CSB_B7M5_transformation').status}\",\n    \"DFName\":\"@{pipeline().DataFactory}\",\n    \"RunId\":\"@{pipeline().RunId}\",\n    \"TO\": \"@{pipeline().parameters.To}\",\n    \"Cc\":\"@{pipeline().parameters.Cc}\",\n    \"Tmp\":\"@{pipeline().parameters.Tmp}\"\n}",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"parameters": {
+					"Table_name": {
+						"type": "String",
+						"defaultValue": "table2"
+					},
+					"To": {
+						"type": "string",
+						"defaultValue": "manish.kailodiya@impetus.com;pradeep.thanniru@impetus.com;dipin.raj@impetus.com;shekhar.zambare@impetus.com;harsh.verma@impetus.com"
+					},
+					"Cc": {
+						"type": "string",
+						"defaultValue": "manish.kailodiya@impetus.com"
+					},
+					"Tmp": {
+						"type": "string",
+						"defaultValue": "defnone"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2023-09-11T15:46:33Z"
+			},
+			"dependsOn": []
+		}
+	]
+}
